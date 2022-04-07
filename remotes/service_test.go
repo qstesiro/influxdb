@@ -56,8 +56,7 @@ var (
 func TestCreateAndGetConnection(t *testing.T) {
 	t.Parallel()
 
-	svc, clean := newTestService(t)
-	defer clean(t)
+	svc := newTestService(t)
 
 	// Getting an invalid ID should return an error.
 	got, err := svc.GetRemoteConnection(ctx, initID)
@@ -78,8 +77,7 @@ func TestCreateAndGetConnection(t *testing.T) {
 func TestUpdateAndGetConnection(t *testing.T) {
 	t.Parallel()
 
-	svc, clean := newTestService(t)
-	defer clean(t)
+	svc := newTestService(t)
 
 	// Updating a nonexistent ID fails.
 	updated, err := svc.UpdateRemoteConnection(ctx, initID, updateReq)
@@ -105,8 +103,7 @@ func TestUpdateAndGetConnection(t *testing.T) {
 func TestUpdateNoop(t *testing.T) {
 	t.Parallel()
 
-	svc, clean := newTestService(t)
-	defer clean(t)
+	svc := newTestService(t)
 
 	// Create a connection.
 	created, err := svc.CreateRemoteConnection(ctx, createReq)
@@ -127,8 +124,7 @@ func TestUpdateNoop(t *testing.T) {
 func TestDeleteConnection(t *testing.T) {
 	t.Parallel()
 
-	svc, clean := newTestService(t)
-	defer clean(t)
+	svc := newTestService(t)
 
 	// Deleting a nonexistent ID should return an error.
 	require.Equal(t, errRemoteNotFound, svc.DeleteRemoteConnection(ctx, initID))
@@ -166,8 +162,7 @@ func TestListConnections(t *testing.T) {
 	t.Run("list all", func(t *testing.T) {
 		t.Parallel()
 
-		svc, clean := newTestService(t)
-		defer clean(t)
+		svc := newTestService(t)
 		allConns := setup(t, svc)
 
 		listed, err := svc.ListRemoteConnections(ctx, influxdb.RemoteConnectionListFilter{OrgID: connection.OrgID})
@@ -178,8 +173,7 @@ func TestListConnections(t *testing.T) {
 	t.Run("list by name", func(t *testing.T) {
 		t.Parallel()
 
-		svc, clean := newTestService(t)
-		defer clean(t)
+		svc := newTestService(t)
 		allConns := setup(t, svc)
 
 		listed, err := svc.ListRemoteConnections(ctx, influxdb.RemoteConnectionListFilter{
@@ -193,8 +187,7 @@ func TestListConnections(t *testing.T) {
 	t.Run("list by URL", func(t *testing.T) {
 		t.Parallel()
 
-		svc, clean := newTestService(t)
-		defer clean(t)
+		svc := newTestService(t)
 		allConns := setup(t, svc)
 
 		listed, err := svc.ListRemoteConnections(ctx, influxdb.RemoteConnectionListFilter{
@@ -208,8 +201,7 @@ func TestListConnections(t *testing.T) {
 	t.Run("list by other org ID", func(t *testing.T) {
 		t.Parallel()
 
-		svc, clean := newTestService(t)
-		defer clean(t)
+		svc := newTestService(t)
 		setup(t, svc)
 
 		listed, err := svc.ListRemoteConnections(ctx, influxdb.RemoteConnectionListFilter{OrgID: platform.ID(1000)})
@@ -218,8 +210,8 @@ func TestListConnections(t *testing.T) {
 	})
 }
 
-func newTestService(t *testing.T) (*service, func(t *testing.T)) {
-	store, clean := sqlite.NewTestStore(t)
+func newTestService(t *testing.T) *service {
+	store := sqlite.NewTestStore(t)
 	logger := zaptest.NewLogger(t)
 	sqliteMigrator := sqlite.NewMigrator(store, logger)
 	require.NoError(t, sqliteMigrator.Up(ctx, migrations.AllUp))
@@ -229,5 +221,5 @@ func newTestService(t *testing.T) (*service, func(t *testing.T)) {
 		idGenerator: mock.NewIncrementingIDGenerator(initID),
 	}
 
-	return &svc, clean
+	return &svc
 }

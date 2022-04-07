@@ -72,8 +72,7 @@ var (
 func TestCreateAndGetReplication(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	insertRemote(t, testStore, replication.RemoteID)
 
@@ -96,8 +95,7 @@ func TestCreateAndGetReplication(t *testing.T) {
 func TestCreateMissingRemote(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	created, err := testStore.CreateReplication(ctx, initID, createReq)
 	require.Error(t, err)
@@ -113,8 +111,7 @@ func TestCreateMissingRemote(t *testing.T) {
 func TestUpdateAndGetReplication(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	insertRemote(t, testStore, replication.RemoteID)
 	insertRemote(t, testStore, updatedReplication.RemoteID)
@@ -138,8 +135,7 @@ func TestUpdateAndGetReplication(t *testing.T) {
 func TestUpdateResponseInfo(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	insertRemote(t, testStore, replication.RemoteID)
 	insertRemote(t, testStore, updatedReplication.RemoteID)
@@ -170,8 +166,7 @@ func TestUpdateResponseInfo(t *testing.T) {
 func TestUpdateMissingRemote(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	insertRemote(t, testStore, replication.RemoteID)
 
@@ -195,8 +190,7 @@ func TestUpdateMissingRemote(t *testing.T) {
 func TestUpdateNoop(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	insertRemote(t, testStore, replication.RemoteID)
 
@@ -214,8 +208,7 @@ func TestUpdateNoop(t *testing.T) {
 func TestDeleteReplication(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	insertRemote(t, testStore, replication.RemoteID)
 
@@ -237,8 +230,7 @@ func TestDeleteReplication(t *testing.T) {
 func TestDeleteReplications(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	// Deleting when there is no bucket is OK.
 	_, err := testStore.DeleteBucketReplications(ctx, replication.LocalBucketID)
@@ -297,8 +289,7 @@ func TestListReplications(t *testing.T) {
 	t.Run("list all for org", func(t *testing.T) {
 		t.Parallel()
 
-		testStore, clean := newTestStore(t)
-		defer clean(t)
+		testStore := newTestStore(t)
 		allRepls := setup(t, testStore)
 
 		listed, err := testStore.ListReplications(ctx, influxdb.ReplicationListFilter{OrgID: createReq.OrgID})
@@ -309,8 +300,7 @@ func TestListReplications(t *testing.T) {
 	t.Run("list all with empty filter", func(t *testing.T) {
 		t.Parallel()
 
-		testStore, clean := newTestStore(t)
-		defer clean(t)
+		testStore := newTestStore(t)
 		allRepls := setup(t, testStore)
 
 		otherOrgReq := createReq
@@ -327,8 +317,7 @@ func TestListReplications(t *testing.T) {
 	t.Run("list by name", func(t *testing.T) {
 		t.Parallel()
 
-		testStore, clean := newTestStore(t)
-		defer clean(t)
+		testStore := newTestStore(t)
 		allRepls := setup(t, testStore)
 
 		listed, err := testStore.ListReplications(ctx, influxdb.ReplicationListFilter{
@@ -342,8 +331,7 @@ func TestListReplications(t *testing.T) {
 	t.Run("list by remote ID", func(t *testing.T) {
 		t.Parallel()
 
-		testStore, clean := newTestStore(t)
-		defer clean(t)
+		testStore := newTestStore(t)
 		allRepls := setup(t, testStore)
 
 		listed, err := testStore.ListReplications(ctx, influxdb.ReplicationListFilter{
@@ -357,8 +345,7 @@ func TestListReplications(t *testing.T) {
 	t.Run("list by bucket ID", func(t *testing.T) {
 		t.Parallel()
 
-		testStore, clean := newTestStore(t)
-		defer clean(t)
+		testStore := newTestStore(t)
 		allRepls := setup(t, testStore)
 
 		listed, err := testStore.ListReplications(ctx, influxdb.ReplicationListFilter{
@@ -372,8 +359,7 @@ func TestListReplications(t *testing.T) {
 	t.Run("list by other org ID", func(t *testing.T) {
 		t.Parallel()
 
-		testStore, clean := newTestStore(t)
-		defer clean(t)
+		testStore := newTestStore(t)
 
 		listed, err := testStore.ListReplications(ctx, influxdb.ReplicationListFilter{OrgID: platform.ID(2)})
 		require.NoError(t, err)
@@ -384,8 +370,7 @@ func TestListReplications(t *testing.T) {
 func TestGetFullHTTPConfig(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	// Does not exist returns the appropriate error
 	_, err := testStore.GetFullHTTPConfig(ctx, initID)
@@ -405,8 +390,7 @@ func TestGetFullHTTPConfig(t *testing.T) {
 func TestPopulateRemoteHTTPConfig(t *testing.T) {
 	t.Parallel()
 
-	testStore, clean := newTestStore(t)
-	defer clean(t)
+	testStore := newTestStore(t)
 
 	emptyConfig := &influxdb.ReplicationHTTPConfig{}
 
@@ -429,8 +413,8 @@ func TestPopulateRemoteHTTPConfig(t *testing.T) {
 	require.Equal(t, want, *target)
 }
 
-func newTestStore(t *testing.T) (*Store, func(t *testing.T)) {
-	sqlStore, clean := sqlite.NewTestStore(t)
+func newTestStore(t *testing.T) *Store {
+	sqlStore := sqlite.NewTestStore(t)
 	logger := zaptest.NewLogger(t)
 	sqliteMigrator := sqlite.NewMigrator(sqlStore, logger)
 	require.NoError(t, sqliteMigrator.Up(ctx, migrations.AllUp))
@@ -439,7 +423,7 @@ func newTestStore(t *testing.T) (*Store, func(t *testing.T)) {
 	_, err := sqlStore.DB.Exec("PRAGMA foreign_keys = ON;")
 	require.NoError(t, err)
 
-	return NewStore(sqlStore), clean
+	return NewStore(sqlStore)
 }
 
 func insertRemote(t *testing.T, store *Store, id platform.ID) {

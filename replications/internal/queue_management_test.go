@@ -3,7 +3,6 @@ package internal
 import (
 	"errors"
 	"io"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -35,12 +34,13 @@ func TestCreateNewQueueDirExists(t *testing.T) {
 	t.Parallel()
 
 	queuePath, qm := initQueueManager(t)
-	defer os.RemoveAll(filepath.Dir(queuePath))
 
 	err := qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0)
 
 	require.NoError(t, err)
 	require.DirExists(t, filepath.Join(queuePath, id1.String()))
+
+	shutdown(t, qm)
 }
 
 func TestEnqueueScan(t *testing.T) {
@@ -78,9 +78,10 @@ func TestEnqueueScan(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
-			queuePath, qm := initQueueManager(t)
-			defer os.RemoveAll(filepath.Dir(queuePath))
+			_, qm := initQueueManager(t)
 
 			// Create new queue
 			err := qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0)
@@ -97,6 +98,9 @@ func TestEnqueueScan(t *testing.T) {
 			// Check queue position
 			closeRq(rq)
 			scan, err := rq.queue.NewScanner()
+			t.Cleanup(func() {
+				require.NoError(t, rq.queue.Close())
+			})
 
 			if tt.writeFuncReturn == nil {
 				require.ErrorIs(t, err, io.EOF)
@@ -115,8 +119,7 @@ func TestEnqueueScan(t *testing.T) {
 func TestCreateNewQueueDuplicateID(t *testing.T) {
 	t.Parallel()
 
-	queuePath, qm := initQueueManager(t)
-	defer os.RemoveAll(filepath.Dir(queuePath))
+	_, qm := initQueueManager(t)
 
 	// Create a valid new queue
 	err := qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0)
@@ -125,13 +128,14 @@ func TestCreateNewQueueDuplicateID(t *testing.T) {
 	// Try to initialize another queue with the same replication ID
 	err = qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0)
 	require.EqualError(t, err, "durable queue already exists for replication ID \"0000000000000001\"")
+
+	shutdown(t, qm)
 }
 
 func TestDeleteQueueDirRemoved(t *testing.T) {
 	t.Parallel()
 
 	queuePath, qm := initQueueManager(t)
-	defer os.RemoveAll(filepath.Dir(queuePath))
 
 	// Create a valid new queue
 	err := qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0)
@@ -147,8 +151,7 @@ func TestDeleteQueueDirRemoved(t *testing.T) {
 func TestDeleteQueueNonexistentID(t *testing.T) {
 	t.Parallel()
 
-	queuePath, qm := initQueueManager(t)
-	defer os.RemoveAll(filepath.Dir(queuePath))
+	_, qm := initQueueManager(t)
 
 	// Delete nonexistent queue
 	err := qm.DeleteQueue(id1)
@@ -158,8 +161,7 @@ func TestDeleteQueueNonexistentID(t *testing.T) {
 func TestUpdateMaxQueueSizeNonexistentID(t *testing.T) {
 	t.Parallel()
 
-	queuePath, qm := initQueueManager(t)
-	defer os.RemoveAll(filepath.Dir(queuePath))
+	_, qm := initQueueManager(t)
 
 	// Update nonexistent queue
 	err := qm.UpdateMaxQueueSize(id1, influxdb.DefaultReplicationMaxQueueSizeBytes)
@@ -170,7 +172,6 @@ func TestStartReplicationQueue(t *testing.T) {
 	t.Parallel()
 
 	queuePath, qm := initQueueManager(t)
-	defer os.RemoveAll(filepath.Dir(queuePath))
 
 	// Create new queue
 	err := qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0)
@@ -199,13 +200,14 @@ func TestStartReplicationQueue(t *testing.T) {
 	// Ensure queue is open by trying to remove, will error if open
 	err = qm.replicationQueues[id1].queue.Remove()
 	require.Errorf(t, err, "queue is open")
+
+	require.NoError(t, qm.replicationQueues[id1].queue.Close())
 }
 
 func TestStartReplicationQueuePartialDelete(t *testing.T) {
 	t.Parallel()
 
 	queuePath, qm := initQueueManager(t)
-	defer os.RemoveAll(filepath.Dir(queuePath))
 
 	// Create new queue
 	err := qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0)
@@ -233,7 +235,6 @@ func TestStartReplicationQueuesMultiple(t *testing.T) {
 	t.Parallel()
 
 	queuePath, qm := initQueueManager(t)
-	defer os.RemoveAll(filepath.Dir(queuePath))
 
 	// Create queue1
 	err := qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0)
@@ -280,13 +281,15 @@ func TestStartReplicationQueuesMultiple(t *testing.T) {
 	require.Errorf(t, err, "queue is open")
 	err = qm.replicationQueues[id2].queue.Remove()
 	require.Errorf(t, err, "queue is open")
+
+	require.NoError(t, qm.replicationQueues[id1].queue.Close())
+	require.NoError(t, qm.replicationQueues[id2].queue.Close())
 }
 
 func TestStartReplicationQueuesMultipleWithPartialDelete(t *testing.T) {
 	t.Parallel()
 
 	queuePath, qm := initQueueManager(t)
-	defer os.RemoveAll(filepath.Dir(queuePath))
 
 	// Create queue1
 	err := qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0)
@@ -325,14 +328,14 @@ func TestStartReplicationQueuesMultipleWithPartialDelete(t *testing.T) {
 	// Ensure queue1 is open by trying to remove, will error if open
 	err = qm.replicationQueues[id1].queue.Remove()
 	require.Errorf(t, err, "queue is open")
+
+	require.NoError(t, qm.replicationQueues[id1].queue.Close())
 }
 
 func initQueueManager(t *testing.T) (string, *durableQueueManager) {
 	t.Helper()
 
-	enginePath, err := os.MkdirTemp("", "engine")
-	require.NoError(t, err)
-	queuePath := filepath.Join(enginePath, "replicationq")
+	queuePath := filepath.Join(t.TempDir(), "replicationq")
 
 	logger := zaptest.NewLogger(t)
 	qm := NewDurableQueueManager(logger, queuePath, metrics.NewReplicationsMetrics(), replicationsMock.NewMockHttpConfigStore(nil))
@@ -403,9 +406,7 @@ func getTestRemoteWriter(t *testing.T, expected string) remoteWriter {
 func TestEnqueueData(t *testing.T) {
 	t.Parallel()
 
-	queuePath, err := os.MkdirTemp("", "testqueue")
-	require.NoError(t, err)
-	defer os.RemoveAll(queuePath)
+	queuePath := t.TempDir()
 
 	logger := zaptest.NewLogger(t)
 	qm := NewDurableQueueManager(logger, queuePath, metrics.NewReplicationsMetrics(), replicationsMock.NewMockHttpConfigStore(nil))
@@ -424,6 +425,9 @@ func TestEnqueueData(t *testing.T) {
 	rq, ok := qm.replicationQueues[id1]
 	require.True(t, ok)
 	closeRq(rq)
+	t.Cleanup(func() {
+		require.NoError(t, rq.queue.Close())
+	})
 	go func() { <-rq.receive }() // absorb the receive to avoid testcase deadlock
 
 	require.NoError(t, qm.EnqueueData(id1, []byte(data), 1))
@@ -450,7 +454,6 @@ func TestSendWrite(t *testing.T) {
 	}
 
 	path, qm := initQueueManager(t)
-	defer os.RemoveAll(path)
 	require.NoError(t, qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0))
 	require.DirExists(t, filepath.Join(path, id1.String()))
 
@@ -517,7 +520,6 @@ func TestEnqueueData_WithMetrics(t *testing.T) {
 	t.Parallel()
 
 	path, qm := initQueueManager(t)
-	defer os.RemoveAll(path)
 	require.NoError(t, qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0))
 	require.DirExists(t, filepath.Join(path, id1.String()))
 
@@ -525,6 +527,9 @@ func TestEnqueueData_WithMetrics(t *testing.T) {
 	rq, ok := qm.replicationQueues[id1]
 	require.True(t, ok)
 	closeRq(rq)
+	t.Cleanup(func() {
+		require.NoError(t, rq.queue.Close())
+	})
 
 	reg := prom.NewRegistry(zaptest.NewLogger(t))
 	reg.MustRegister(qm.metrics.PrometheusCollectors()...)
@@ -559,7 +564,6 @@ func TestEnqueueData_EnqueueFailure(t *testing.T) {
 	t.Parallel()
 
 	path, qm := initQueueManager(t)
-	defer os.RemoveAll(path)
 	require.NoError(t, qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0))
 	require.DirExists(t, filepath.Join(path, id1.String()))
 
@@ -592,7 +596,6 @@ func TestGoroutineReceives(t *testing.T) {
 	t.Parallel()
 
 	path, qm := initQueueManager(t)
-	defer os.RemoveAll(path)
 	require.NoError(t, qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0))
 	require.DirExists(t, filepath.Join(path, id1.String()))
 
@@ -600,6 +603,9 @@ func TestGoroutineReceives(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, rq)
 	closeRq(rq) // atypical from normal behavior, but lets us receive channels to test
+	t.Cleanup(func() {
+		require.NoError(t, rq.queue.Close())
+	})
 
 	go func() { require.NoError(t, qm.EnqueueData(id1, []byte("1234"), 1)) }()
 	select {
@@ -615,7 +621,6 @@ func TestGoroutineCloses(t *testing.T) {
 	t.Parallel()
 
 	path, qm := initQueueManager(t)
-	defer os.RemoveAll(path)
 	require.NoError(t, qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0))
 	require.DirExists(t, filepath.Join(path, id1.String()))
 
@@ -640,7 +645,9 @@ func TestGetReplications(t *testing.T) {
 	t.Parallel()
 
 	path, qm := initQueueManager(t)
-	defer os.RemoveAll(path)
+	t.Cleanup(func() {
+		shutdown(t, qm)
+	})
 
 	// Initialize 3 queues (2nd and 3rd share the same orgID and localBucket)
 	require.NoError(t, qm.InitializeQueue(id1, maxQueueSizeBytes, orgID1, localBucketID1, 0))
