@@ -153,7 +153,7 @@ func TestStore_BadShard(t *testing.T) {
 			sh := tsdb.NewTempShard(t, idx)
 			err := s.OpenShard(context.Background(), sh.Shard, false)
 			require.NoError(t, err, "opening temp shard")
-			defer require.NoError(t, sh.Close(), "closing temporary shard")
+			require.NoError(t, sh.Close(), "closing temporary shard")
 
 			s.SetShardOpenErrorForTest(sh.ID(), errors.New(errStr))
 			err2 := s.OpenShard(context.Background(), sh.Shard, false)
@@ -163,6 +163,7 @@ func TestStore_BadShard(t *testing.T) {
 
 			// This should succeed with the force (and because opening an open shard automatically succeeds)
 			require.NoError(t, s.OpenShard(context.Background(), sh.Shard, true), "forced re-opening previously failing shard")
+			require.NoError(t, sh.Close())
 		}()
 	}
 }
