@@ -913,7 +913,7 @@ jobs:
       until:
         type: string
     docker:
-      - image: quay.io/influxdb/changelogger:81cd97477f9a6c9f2db03dc56f560bf54f8da8bb
+      - image: quay.io/influxdb/changelogger:a6d0dbfb2e0f2313cdf67ade0693047aa0690f94
     steps:
       - checkout
       - run:
