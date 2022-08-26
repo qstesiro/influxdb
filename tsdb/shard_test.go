@@ -1588,6 +1588,9 @@ _reserved,region=uswest value="foo" 0
 }
 
 func TestMeasurementFieldSet_SaveLoad(t *testing.T) {
+	const measurement = "cpu"
+	const fieldName = "value"
+
 	dir, cleanup := MustTempDir()
 	defer cleanup()
 
@@ -1597,12 +1600,19 @@ func TestMeasurementFieldSet_SaveLoad(t *testing.T) {
 		t.Fatalf("NewMeasurementFieldSet error: %v", err)
 	}
 	defer mf.Close()
-	fields := mf.CreateFieldsIfNotExists([]byte("cpu"))
-	if err := fields.CreateFieldIfNotExists([]byte("value"), influxql.Float); err != nil {
+	fields := mf.CreateFieldsIfNotExists([]byte(measurement))
+	if err := fields.CreateFieldIfNotExists([]byte(fieldName), influxql.Float); err != nil {
 		t.Fatalf("create field error: %v", err)
 	}
+	change := tsdb.FieldChange{
+		FieldCreate: tsdb.FieldCreate{
+			Measurement: []byte(measurement),
+			Field:       &tsdb.Field{ID: 0, Name: fieldName, Type: influxql.Float},
+		},
+		Delete: false,
+	}
 
-	if err := mf.Save(); err != nil {
+	if err := mf.Save(tsdb.FieldChanges{&change}); err != nil {
 		t.Fatalf("save error: %v", err)
 	}
 
@@ -1611,8 +1621,8 @@ func TestMeasurementFieldSet_SaveLoad(t *testing.T) {
 		t.Fatalf("NewMeasurementFieldSet error: %v", err)
 	}
 	defer mf2.Close()
-	fields = mf2.FieldsByString("cpu")
-	field := fields.Field("value")
+	fields = mf2.FieldsByString(measurement)
+	field := fields.Field(fieldName)
 	if field == nil {
 		t.Fatalf("field is null")
 	}
@@ -1633,12 +1643,21 @@ func TestMeasurementFieldSet_Corrupt(t *testing.T) {
 			t.Fatalf("NewMeasurementFieldSet error: %v", err)
 		}
 		defer mf.Close()
-		fields := mf.CreateFieldsIfNotExists([]byte("cpu"))
-		if err := fields.CreateFieldIfNotExists([]byte("value"), influxql.Float); err != nil {
+		measurement := []byte("cpu")
+		fields := mf.CreateFieldsIfNotExists(measurement)
+		fieldName := "value"
+		if err := fields.CreateFieldIfNotExists([]byte(fieldName), influxql.Float); err != nil {
 			t.Fatalf("create field error: %v", err)
 		}
+		change := tsdb.FieldChange{
+			FieldCreate: tsdb.FieldCreate{
+				Measurement: []byte(measurement),
+				Field:       &tsdb.Field{ID: 0, Name: fieldName, Type: influxql.Float},
+			},
+			Delete: false,
+		}
 
-		if err := mf.Save(); err != nil {
+		if err := mf.Save(tsdb.FieldChanges{&change}); err != nil {
 			t.Fatalf("save error: %v", err)
 		}
 	}()
@@ -1662,6 +1681,9 @@ func TestMeasurementFieldSet_Corrupt(t *testing.T) {
 	}
 }
 func TestMeasurementFieldSet_DeleteEmpty(t *testing.T) {
+	const measurement = "cpu"
+	const fieldName = "value"
+
 	dir, cleanup := MustTempDir()
 	defer cleanup()
 
@@ -1671,12 +1693,20 @@ func TestMeasurementFieldSet_DeleteEmpty(t *testing.T) {
 		t.Fatalf("NewMeasurementFieldSet error: %v", err)
 	}
 	defer mf.Close()
-	fields := mf.CreateFieldsIfNotExists([]byte("cpu"))
-	if err := fields.CreateFieldIfNotExists([]byte("value"), influxql.Float); err != nil {
+	fields := mf.CreateFieldsIfNotExists([]byte(measurement))
+	if err := fields.CreateFieldIfNotExists([]byte(fieldName), influxql.Float); err != nil {
 		t.Fatalf("create field error: %v", err)
 	}
 
-	if err := mf.Save(); err != nil {
+	change := tsdb.FieldChange{
+		FieldCreate: tsdb.FieldCreate{
+			Measurement: []byte(measurement),
+			Field:       &tsdb.Field{ID: 0, Name: fieldName, Type: influxql.Float},
+		},
+		Delete: false,
+	}
+
+	if err := mf.Save(tsdb.FieldChanges{&change}); err != nil {
 		t.Fatalf("save error: %v", err)
 	}
 	mf2, err := tsdb.NewMeasurementFieldSet(path)
@@ -1684,8 +1714,8 @@ func TestMeasurementFieldSet_DeleteEmpty(t *testing.T) {
 		t.Fatalf("NewMeasurementFieldSet error: %v", err)
 	}
 	defer mf2.Close()
-	fields = mf2.FieldsByString("cpu")
-	field := fields.Field("value")
+	fields = mf2.FieldsByString(measurement)
+	field := fields.Field(fieldName)
 	if field == nil {
 		t.Fatalf("field is null")
 	}
@@ -1694,9 +1724,9 @@ func TestMeasurementFieldSet_DeleteEmpty(t *testing.T) {
 		t.Fatalf("field type mismatch: got %v, exp %v", got, exp)
 	}
 
-	mf2.Delete("cpu")
+	mf2.Delete(measurement)
 
-	if err := mf2.Save(); err != nil {
+	if err := mf2.Save(tsdb.MeasurementsToFieldChangeDeletions([]string{measurement})); err != nil {
 		t.Fatalf("save after delete error: %v", err)
 	}
 
@@ -1778,13 +1808,24 @@ func TestMeasurementFieldSet_ConcurrentSave(t *testing.T) {
 func testFieldMaker(t *testing.T, wg *sync.WaitGroup, mf *tsdb.MeasurementFieldSet, measurement string, fieldNames []string) {
 	defer wg.Done()
 	fields := mf.CreateFieldsIfNotExists([]byte(measurement))
+
 	for _, fieldName := range fieldNames {
 		if err := fields.CreateFieldIfNotExists([]byte(fieldName), influxql.Float); err != nil {
 			t.Logf("create field error: %v", err)
 			t.Fail()
 			return
 		}
-		if err := mf.Save(); err != nil {
+
+		change := tsdb.FieldChange{
+			FieldCreate: tsdb.FieldCreate{
+				Measurement: []byte(measurement),
+				Field:       &tsdb.Field{ID: 0, Name: fieldName, Type: influxql.Float},
+			},
+			Delete: false,
+		}
+
+		err := mf.Save(tsdb.FieldChanges{&change})
+		if err != nil {
 			t.Logf("save error: %v", err)
 			t.Fail()
 			return
