@@ -76,11 +76,13 @@ CMDS := \
 	bin/$(GOOS)/influxd
 
 all: generate $(CMDS)
+	echo "------------------------------------- all"
 
 #
 # Define targets for commands
 #
 bin/$(GOOS)/influxd: $(SOURCES)
+	echo "------------------------------------- bin/$(GOOS)/influxd"
 	$(GO_BUILD) -o $@ ./cmd/$(shell basename "$@")
 
 influxd: bin/$(GOOS)/influxd
@@ -100,95 +102,130 @@ static/static_gen.go: static/data/build static/data/swagger.json
 #
 
 fmt: $(SOURCES_NO_VENDOR)
+	echo "------------------------------------- fmt"
 	./etc/fmt.sh
 
 checkfmt:
+	echo "------------------------------------- checkfmt"
 	./etc/checkfmt.sh
 	$(GO_RUN) github.com/editorconfig-checker/editorconfig-checker/cmd/editorconfig-checker
 
 tidy:
+	echo "------------------------------------- tidy"
 	GO111MODULE=on go mod tidy
 
 checktidy:
+	echo "------------------------------------- checktidy"
 	./etc/checktidy.sh
 
 checkgenerate:
+	echo "------------------------------------- checkgenerate"
 	./etc/checkgenerate.sh
 
 checksqlmigrations:
+	echo "------------------------------------- checksqlmigrations"
 	./etc/check-sql-migrations.sh
 
 # generate-web-assets outputs all the files needed to link the UI to the back-end.
 # Currently, none of these files are tracked by git.
 generate-web-assets: static/static_gen.go
+	echo "------------------------------------- generate-web-assets"
+
 
 # generate-sources outputs all the Go files generated from protobufs, tmpls, and other tooling.
 # These files are tracked by git; CI will enforce that they are up-to-date.
 generate-sources: protoc tmpl stringer goimports
+	echo "------------------------------------- generate-sources"
 	$(GO_GENERATE) ./influxql/... ./models/... ./pkg/... ./storage/... ./tsdb/... ./v1/...
 
 generate: generate-web-assets generate-sources
+	echo "------------------------------------- generate"
+
+# ???
+# generate: generate-sources
 
 protoc:
+	echo "------------------------------------- protoc"
 	$(GO_INSTALL) google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1
 
 tmpl:
+	echo "------------------------------------- tmpl"
 	$(GO_INSTALL) github.com/benbjohnson/tmpl
 
 stringer:
+	echo "------------------------------------- stringer"
 	$(GO_INSTALL) golang.org/x/tools/cmd/stringer
 
 goimports:
+	echo "------------------------------------- goimports"
 	$(GO_INSTALL) golang.org/x/tools/cmd/goimports
 
 test-go:
+	echo "------------------------------------- test-go"
 	$(GO_TEST) $(GO_TEST_PATHS)
 
 test-flux:
+	echo "------------------------------------- test-flux"
 	@./etc/test-flux.sh
 
 test-tls:
+	echo "------------------------------------- test-tls"
 	@./etc/test-tls.sh
 
-test-integration: GO_TAGS=integration
 test-integration:
+	echo "------------------------------------- test-integration"
+	GO_TAGS=integration
+test-integration:
+	echo "------------------------------------- test-integration"
 	$(GO_TEST) -count=1 $(GO_TEST_PATHS)
 
-test: test-go
+test:
+	echo "------------------------------------- test"
+	test-go
 
 test-go-race:
+	echo "------------------------------------- test-go-race"
 	$(GO_TEST) -v -race -count=1 $(GO_TEST_PATHS)
 
 vet:
+	echo "------------------------------------- vet"
 	$(GO_VET) -v ./...
 
 bench:
+	echo "------------------------------------- bench"
 	$(GO_TEST) -bench=. -run=^$$ ./...
 
-build: all
+build:
+	echo "------------------------------------- build"
+	all
 
 pkg-config:
+	echo "------------------------------------- pkg-config"
 	$(GO_INSTALL) github.com/influxdata/pkg-config
 
 clean:
+	echo "------------------------------------- clean"
 	$(RM) -r static/static_gen.go static/data
 	$(RM) -r bin
 	$(RM) -r dist
 
 # generate feature flags
 flags:
+	echo "------------------------------------- flags"
 	$(GO_GENERATE) ./kit/feature
 
 docker-image-influx:
+	echo "------------------------------------- docker-image-influx"
 	@cp .gitignore .dockerignore
 	@docker image build -t influxdb:dev --target influx .
-	
+
 dshell-image:
 	@cp .gitignore .dockerignore
 	@docker image build --build-arg "USERID=$(shell id -u)" -t influxdb:dshell --target dshell .
 
-dshell: dshell-image
-	@docker container run --rm -p 8086:8086 -p 8080:8080 -u $(shell id -u) -it -v $(shell pwd):/code -w /code influxdb:dshell 
+dshell:
+	dshell-image
+	@docker container run --rm -p 8086:8086 -p 8080:8080 -u $(shell id -u) -it -v $(shell pwd):/code -w /code influxdb:dshell
 
 # .PHONY targets represent actions that do not create an actual file.
 .PHONY: all $(SUBDIRS) run fmt checkfmt tidy checktidy checkgenerate test test-go test-go-race test-tls bench clean node_modules vet nightly dist protoc influxd libflux flags dshell dclean docker-image-flux docker-image-influx pkg-config
