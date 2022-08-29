@@ -138,7 +138,10 @@ generate-sources: protoc tmpl stringer goimports
 	echo "------------------------------------- generate-sources"
 	$(GO_GENERATE) ./influxql/... ./models/... ./pkg/... ./storage/... ./tsdb/... ./v1/...
 
-generate: generate-web-assets generate-sources
+# generate: generate-web-assets generate-sources
+# 	echo "------------------------------------- generate"
+
+generate: generate-sources
 	echo "------------------------------------- generate"
 
 # ???
